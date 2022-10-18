@@ -31,6 +31,7 @@ class Player:
         self.player_id = df["PLAYER_ID"]
         self.pre_rating = 0
         self.post_rating = 0
+        self.plus_minus = df["PLUS_MINUS"]
 
         time_played = df["MIN"]
         if isinstance(time_played, float):
@@ -91,6 +92,7 @@ class Game:
             b) Pick some number (say 10) and normalize all teams to have this
             number of players (choose the top N ratings on the team).
         """
+        """
         self.home_team_rating = sum(
             map((lambda player: player.pre_rating), self.home_team)
         ) / len(self.home_team)
@@ -98,6 +100,25 @@ class Game:
         self.away_team_rating = sum(
             map((lambda player: player.pre_rating), self.away_team)
         ) / len(self.away_team)
+        """
+        
+        """
+        An attempt at fixing the above issue
+        We will multiply the time played by the pre_rating
+        and normalize over the length of a game. Unless there
+        are abnormal data entries this should average 5 players
+        over the total game length so ELO should be close to 2.5.
+        Then we factor in the star player's rating in a similar
+        manner.
+        """
+        self.home_team_rating = sum(
+            map((lambda player: player.pre_rating*player.seconds_played/(60*48)), self.home_team)
+            ) / 5
+        
+        self.away_team_rating = sum(
+            map((lambda player: player.pre_rating*player.seconds_played/(60*48)), self.away_team)
+            ) / 5
+        
         
         "Star Player Adjustment"
         home_sp_rating = 0
@@ -110,10 +131,10 @@ class Game:
             if player.pre_rating > away_sp_rating:
                 away_sp_rating = player.pre_rating
                 
-        self.home_team_rating = (self.home_team_rating * len(self.home_team)
-                                 + home_sp_rating)/(len(self.home_team) + 1)
-        self.away_team_rating = (self.away_team_rating * len(self.away_team)
-                                 + away_sp_rating)/(len(self.away_team) + 1)
+        self.home_team_rating = (self.home_team_rating * 5
+                                 + home_sp_rating)/6
+        self.away_team_rating = (self.away_team_rating * 5
+                                 + away_sp_rating)/6
         
         "END Star Player Adjustment"
         
@@ -202,13 +223,10 @@ for game in tqdm(games.values()):
     if game.home_team and game.away_team:
         game.set_ratings(player_ratings)
 
-"Sort players by rating" "RB - I have no idea what this does but it's not doing what I want. Found it online somewhere."
-sorted_ratings = {v for k, v in sorted(player_ratings.items(), key = lambda item: item[1])}
+"Sort players by rating"
+sorted_ratings = [v for k, v in sorted(player_ratings.items(), key = lambda item: item[1][1])]
 
 print(sorted_ratings)
-
-#for name, rating in sorted_ratings.values():
-    #print(name, rating)
 
 #for name, rating in player_ratings.values():
     #print(name, rating)
