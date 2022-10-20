@@ -54,9 +54,10 @@ class BertClassifier(nn.Module):
         self.relu = nn.ReLU()
 
     def forward(self, inputs, mask):
-        print(masks.shape)
-        _, pooled_output = self.bert(inputs, attention_mask=mask,return_dict=False)
-        dropout_output = self.dropout(pooled_output)
+        # print(masks.shape)
+        output, = self.bert(inputs, attention_mask=None,return_dict=False)
+        # print(output.shape)
+        dropout_output = self.dropout(output[:, 0])
         linear_output = self.linear(dropout_output)
         final_layer = self.relu(linear_output)
 
@@ -150,7 +151,7 @@ model = BertClassifier(hidden_size=rating)
 #     print(train_input, train_label)
 # print(len(df_train),len(df_val), len(df_test))
 
-EPOCHS = 5
+EPOCHS = 50
 LR = 1e-6
 
 train(model, train_data, val_data, LR, EPOCHS)
