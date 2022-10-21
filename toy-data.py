@@ -9,10 +9,11 @@ from transformers import BertConfig
 from transformers.models.bert.modeling_bert import BertEncoder
 
 class Dataset(torch.utils.data.Dataset):
-    def __init__(self, inputs, outputs, masks):
+    def __init__(self, ratings, teams, outputs, masks):
 
         self.labels = outputs
-        self.inputs = inputs
+        self.ratings = ratings
+        self.teams = teams
         self.masks = masks
 
     def classes(self):
@@ -27,36 +28,33 @@ class Dataset(torch.utils.data.Dataset):
 
     def get_batch_inputs(self, idx):
         # Fetch a batch of inputs
-        return self.inputs[idx]
-
-    def get_batch_masks(self, idx):
-        # Fetch a batch of inputs
-        return self.masks[idx]
+        return (self.ratings[idx], self.teams[idx], self.masks[idx])
 
     def __getitem__(self, idx):
 
         batch_inputs = self.get_batch_inputs(idx)
         batch_y = self.get_batch_labels(idx)
-        batch_masks = self.get_batch_masks(idx)
 
-        return batch_inputs, batch_y, batch_masks
+        return batch_inputs, batch_y
 
 class BertClassifier(nn.Module):
 
-    def __init__(self, dropout=0.5, hidden_size=48):
+    def __init__(self, dropout=0.0, hidden_size=48, teams=30):
         super(BertClassifier, self).__init__()
 
         config = BertConfig(hidden_size=hidden_size)
         print(config)
+        self.team_embedding = nn.Embedding(teams, config.hidden_size//2)
         self.bert = BertEncoder(config)
         self.dropout = nn.Dropout(dropout)
         self.linear = nn.Linear(hidden_size, 2)
         self.relu = nn.ReLU()
 
-    def forward(self, inputs, mask):
-        # print(masks.shape)
+    def forward(self, ratings, teams, mask):
+        teams = self.team_embedding(teams)
+        ratings = ratings.unsqueeze(-1).expand_as(teams)
+        inputs = torch.cat([ratings, teams], -1)
         output, = self.bert(inputs, attention_mask=None,return_dict=False)
-        # print(output.shape)
         dropout_output = self.dropout(output[:, 0])
         linear_output = self.linear(dropout_output)
         final_layer = self.relu(linear_output)
@@ -87,12 +85,14 @@ def train(model, train_data, val_data, learning_rate, epochs):
         total_acc_train = 0
         total_loss_train = 0
 
-        for train_input, train_label, train_masks in tqdm(train_dataloader):
+        for train_input, train_label in tqdm(train_dataloader):
 
             train_label = train_label.to(device)
-            input_id = train_input.to(device)
+            train_ratings = train_input[0].to(device)
+            train_team = train_input[1].to(device)
+            train_masks = train_input[2].to(device)
 
-            output = model(input_id, train_masks)
+            output = model(train_ratings, train_team, train_masks)
 
             batch_loss = criterion(output, train_label.long())
             total_loss_train += batch_loss.item()
@@ -135,23 +135,17 @@ players = 32
 rating = 48
 
 output = torch.randint(0, 2, (samples,))
-ratings = torch.randn((samples, players, rating))
+ratings = torch.randn((samples, players))
+teams = torch.randint(0, 30, (samples, players), dtype=torch.long)
 masks = torch.randint(0, 2, (samples, players))
 
 train_data, val_data = Dataset(
-    ratings[: int(samples * 0.8)], output[: int(samples * 0.8)], masks[: int(samples * 0.8)]
-), Dataset(ratings[int(samples * 0.8) :], output[int(samples * 0.8) :], masks[int(samples * 0.8) :])
+    ratings[: int(samples * 0.8)], teams[: int(samples * 0.8)], output[: int(samples * 0.8)], masks[: int(samples * 0.8)]
+), Dataset(ratings[int(samples * 0.8) :], teams[int(samples * 0.8) :], output[int(samples * 0.8) :], masks[int(samples * 0.8) :])
 
 model = BertClassifier(hidden_size=rating)
 
-# train_dataloader = torch.utils.data.DataLoader(train_data, batch_size=2, shuffle=True)
-# val_dataloader = torch.utils.data.DataLoader(val_data, batch_size=2)
-
-# for train_input, train_label in tqdm(train_dataloader):
-#     print(train_input, train_label)
-# print(len(df_train),len(df_val), len(df_test))
-
 EPOCHS = 50
-LR = 1e-6
+LR = 1e-5
 
 train(model, train_data, val_data, LR, EPOCHS)
