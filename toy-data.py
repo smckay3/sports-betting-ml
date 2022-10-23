@@ -54,7 +54,12 @@ class BertClassifier(nn.Module):
         teams = self.team_embedding(teams)
         ratings = ratings.unsqueeze(-1).expand_as(teams)
         inputs = torch.cat([ratings, teams], -1)
-        output, = self.bert(inputs, attention_mask=None,return_dict=False)
+
+        # fix mask shape and transform to additive mask
+        mask = mask[:, None, None, :]
+        mask = (1.0 - mask) * torch.finfo(torch.float32).min
+
+        output, = self.bert(inputs, attention_mask=mask,return_dict=False)
         dropout_output = self.dropout(output[:, 0])
         linear_output = self.linear(dropout_output)
         final_layer = self.relu(linear_output)
