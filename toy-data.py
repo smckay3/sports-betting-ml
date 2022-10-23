@@ -139,6 +139,44 @@ samples = 16
 players = 32
 rating = 48
 
+"""
+samples is the number of games/plays we are testing/training over
+players is a list of player (ratings?) 0-15: home team, 16-31: away team
+rating is the size of our rating range (I think)
+
+output is a win/loss score
+ratings is a pre-rating set for all players in every sample? how do we have access to this for games after the first?
+teams is ?
+"""
+
+import pandas as pd
+
+"Read in games datafile. Contains win/loss, points scored, roster information"
+
+datapath = "data/games.csv"
+games_df = pd.read_csv(datapath)
+games_df.sort_values(by="GAME_DATE_EST", inplace=True)
+
+"Assign true labels to data samples (win/loss)"
+
+output = torch.zeros(len(games_df))
+index = 0
+for _, game_data in tqdm(games_df.iterrows()):
+    output[index] = game_data["HOME_TEAM_WINS"]
+    index += 1
+
+#samples = len(output) # comment this back in when we have everything set up
+
+"Read in game details datafile. Contains time played, plus_minus"
+
+datapath = "data/games_details.csv"
+details_df = pd.read_csv(datapath)
+
+"Assign data sample input values. What are the inputs?"
+
+for _, player_info in tqdm(details_df.iterrows()):
+    index += 1 # placeholder
+
 output = torch.randint(0, 2, (samples,))
 ratings = torch.randn((samples, players))
 teams = torch.randint(0, 30, (samples, players), dtype=torch.long)
@@ -153,4 +191,4 @@ model = BertClassifier(hidden_size=rating)
 EPOCHS = 50
 LR = 1e-5
 
-train(model, train_data, val_data, LR, EPOCHS)
+#train(model, train_data, val_data, LR, EPOCHS)
