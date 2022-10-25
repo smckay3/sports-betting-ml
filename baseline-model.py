@@ -171,12 +171,12 @@ class Dataset(torch.utils.data.Dataset):
 
 class BertClassifier(nn.Module):
 
-    def __init__(self, dropout=0.0, hidden_size=48, teams=30):
+    def __init__(self, dropout=0.5, hidden_size=256):
         super(BertClassifier, self).__init__()
 
-        config = BertConfig(hidden_size=hidden_size)
+        config = BertConfig(hidden_size=hidden_size, intermediate_size=hidden_size*4, num_hidden_layers=8, num_attention_heads=8)
         print(config)
-        self.team_embedding = nn.Embedding(teams, config.hidden_size//2)
+        self.team_embedding = nn.Embedding(2, config.hidden_size//2)
         self.bert = BertEncoder(config)
         self.dropout = nn.Dropout(dropout)
         self.linear = nn.Linear(hidden_size, 2)
@@ -202,9 +202,9 @@ class BertClassifier(nn.Module):
 
 def train(model, train_data, val_data, learning_rate, epochs):
     train_dataloader = torch.utils.data.DataLoader(
-        train_data, batch_size=2, shuffle=True
+        train_data, batch_size=64, shuffle=True
     )
-    val_dataloader = torch.utils.data.DataLoader(val_data, batch_size=2)
+    val_dataloader = torch.utils.data.DataLoader(val_data, batch_size=64)
 
     use_cuda = torch.cuda.is_available()
     device = torch.device("cuda" if use_cuda else "cpu")
@@ -275,21 +275,21 @@ print("parsing players")
 for _, player_info in tqdm(details_df.iterrows()):
     games[player_info["GAME_ID"]].add_player(player_info)
 
-output = torch.zeros(len(games_df))
-index = 0
-samples = len(output)
+samples = len(games_df)
+output = torch.zeros(samples)
 players = 32
 ratings = torch.zeros((samples, players))
 masks = torch.zeros((samples, players))
 
 print("initializing samples and outputs")
-for game in tqdm(games.values()):
+for index, game in tqdm(enumerate(games.values())):
     if game.home_team and game.away_team:
         "Assign true labels to data samples (win/loss)"
         if game.home_team_score == game.away_team_score:
             output[index] = .5
         else:
             output[index] = game.home_team_score > game.away_team_score
+
         
         "Initialize ratings to pre rating for each game based on generic ELO system"
         "Initialize masks to 1 if player exists in that position for input, otherwise 0"
@@ -317,14 +317,14 @@ for game in tqdm(games.values()):
                 #print("Error2")
                 break
         while player_index < 32:
-            masks[index][player_index] = 1
+            masks[index][player_index] = 0
             player_index += 1
             
         "Update ELO ratings after each game"
         game.set_ratings(player_ratings)
-        
+
 "Teams is set so the first 16 players are home (0) and the last 16 are away (1)"
-teams = torch.zeros((samples, players))
+teams = torch.zeros((samples, players), dtype=torch.long)
 teams[:,:16] = 1
 
 np.random.seed(112)
@@ -334,7 +334,7 @@ train_data, val_data = Dataset(
 ), Dataset(ratings[int(samples * 0.8) :], teams[int(samples * 0.8) :], output[int(samples * 0.8) :], masks[int(samples * 0.8) :])
 
 "RB - Adjust parameters"
-model = BertClassifier(hidden_size=48)
+model = BertClassifier(hidden_size=256)
 
 EPOCHS = 50
 LR = 1e-5
