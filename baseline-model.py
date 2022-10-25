@@ -222,6 +222,7 @@ def train(model, train_data, val_data, learning_rate, epochs):
         total_acc_train = 0
         total_loss_train = 0
 
+        model.train()
         for train_input, train_label in tqdm(train_dataloader):
 
             train_label = train_label.to(device)
@@ -244,21 +245,23 @@ def train(model, train_data, val_data, learning_rate, epochs):
         total_acc_val = 0
         total_loss_val = 0
 
-        # with torch.no_grad():
+        model.eval()
+        with torch.no_grad():
 
-        #     for val_input, val_label in val_dataloader:
+            for val_input, val_label in val_dataloader:
 
-        #         val_label = val_label.to(device)
-        #         mask = val_input["attention_mask"].to(device)
-        #         input_id = val_input["input_ids"].squeeze(1).to(device)
+                val_label = val_label.to(device)
+                val_ratings = val_input[0].to(device)
+                val_team = val_input[1].to(device)
+                val_masks = val_input[2].to(device)
 
-        #         output = model(input_id, mask)
+                output = model(val_ratings, val_team, val_masks)
 
-        #         batch_loss = criterion(output, val_label.long())
-        #         total_loss_val += batch_loss.item()
+                batch_loss = criterion(output, val_label.long())
+                total_loss_val += batch_loss.item()
 
-        #         acc = (output.argmax(dim=1) == val_label).sum().item()
-        #         total_acc_val += acc
+                acc = (output.argmax(dim=1) == val_label).sum().item()
+                total_acc_val += acc
 
         print(
             f"Epochs: {epoch_num + 1} | Train Loss: {total_loss_train / len(train_data): .3f} | Train Accuracy: {total_acc_train / len(train_data): .3f} | Val Loss: {total_loss_val / len(val_data): .3f} | Val Accuracy: {total_acc_val / len(val_data): .3f}"
