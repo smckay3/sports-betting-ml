@@ -209,7 +209,8 @@ def train(model, train_data, val_data, learning_rate, epochs):
     use_cuda = torch.cuda.is_available()
     device = torch.device("cuda" if use_cuda else "cpu")
 
-    criterion = nn.CrossEntropyLoss()
+    # criterion = nn.CrossEntropyLoss()
+    criterion = nn.CrossEntropyLoss(label_smoothing=0.1)
     optimizer = Adam(model.parameters(), lr=learning_rate)
 
     if use_cuda:
@@ -280,22 +281,22 @@ for _, player_info in tqdm(details_df.iterrows()):
 
 samples = len(games_df)
 output = torch.zeros(samples)
-players = 32
+players = 48
 ratings = torch.zeros((samples, players))
 masks = torch.zeros((samples, players))
 
 print("initializing samples and outputs")
 for index, game in tqdm(enumerate(games.values())):
     if game.home_team and game.away_team:
-        "Assign true labels to data samples (win/loss)"
+        # "Assign true labels to data samples (win/loss)"
         if game.home_team_score == game.away_team_score:
             output[index] = .5
         else:
             output[index] = game.home_team_score > game.away_team_score
 
         
-        "Initialize ratings to pre rating for each game based on generic ELO system"
-        "Initialize masks to 1 if player exists in that position for input, otherwise 0"
+        # "Initialize ratings to pre rating for each game based on generic ELO system"
+        # "Initialize masks to 1 if player exists in that position for input, otherwise 0"
         player_index = 0
         for player in game.home_team:
             ratings[index][player_index] = player_ratings.get(
@@ -303,32 +304,26 @@ for index, game in tqdm(enumerate(games.values())):
                 )[1]
             masks[index][player_index] = 1
             player_index += 1
-            "This error happens often. Too many players on team 1"
-            if player_index == 16:
-                #print("Error1")
-                break
-        while player_index < 16:
+        while player_index < players // 2:
             masks[index][player_index] = 0
             player_index += 1
+
+        # Away team
         for player in game.away_team:
             ratings[index][player_index] = player_ratings.get(
                 player.player_id, (player.name, 0.5)
                 )[1]
             player_index += 1
-            "This error happens often. Too many players on team 2"
-            if player_index == 32:
-                #print("Error2")
-                break
-        while player_index < 32:
+        while player_index < players:
             masks[index][player_index] = 0
             player_index += 1
             
-        "Update ELO ratings after each game"
+        # "Update ELO ratings after each game"
         game.set_ratings(player_ratings)
 
-"Teams is set so the first 16 players are home (0) and the last 16 are away (1)"
+# "Teams is set so the first 16 players are home (0) and the last 16 are away (1)"
 teams = torch.zeros((samples, players), dtype=torch.long)
-teams[:,:16] = 1
+teams[:,:players//2] = 1
 
 np.random.seed(112)
 
@@ -336,11 +331,11 @@ train_data, val_data = Dataset(
     ratings[: int(samples * 0.8)], teams[: int(samples * 0.8)], output[: int(samples * 0.8)], masks[: int(samples * 0.8)]
 ), Dataset(ratings[int(samples * 0.8) :], teams[int(samples * 0.8) :], output[int(samples * 0.8) :], masks[int(samples * 0.8) :])
 
-"RB - Adjust parameters"
+# "RB - Adjust parameters"
 model = BertClassifier(hidden_size=256)
 
-EPOCHS = 50
-LR = 1e-5
+EPOCHS = 500
+LR = 1e-6
 
 train(model, train_data, val_data, LR, EPOCHS)
 
