@@ -321,7 +321,7 @@ for index, game in tqdm(enumerate(games.values())):
         # "Update ELO ratings after each game"
         game.set_ratings(player_ratings)
 
-# "Teams is set so the first 16 players are home (0) and the last 16 are away (1)"
+# "Teams is set so the first half of players are home (0) and the last half are away (1)"
 teams = torch.zeros((samples, players), dtype=torch.long)
 teams[:,:players//2] = 1
 
@@ -331,7 +331,6 @@ train_data, val_data = Dataset(
     ratings[: int(samples * 0.8)], teams[: int(samples * 0.8)], output[: int(samples * 0.8)], masks[: int(samples * 0.8)]
 ), Dataset(ratings[int(samples * 0.8) :], teams[int(samples * 0.8) :], output[int(samples * 0.8) :], masks[int(samples * 0.8) :])
 
-# "RB - Adjust parameters"
 model = BertClassifier(hidden_size=256)
 
 EPOCHS = 500
