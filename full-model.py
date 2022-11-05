@@ -79,11 +79,15 @@ class Player_Stats:
         3) Playoff game (binary value)
         4) Time since last game played
         5) Pre game ELO
+        The date values are mostly corrupted in our data files so we
+        can't access them.
+        Pre game ELO values are updated as the model trains. The original
+        values could be read in from our baseline model.
         """
         
 class Player:
-    def __init__(self, player):
-        self.player_id = player["PLAYER_ID"]
+    def __init__(self, player_id):
+        self.player_id = player_id
         self.games = []
         
     def add_game(self, game):
@@ -95,6 +99,7 @@ for _, game_data in tqdm(games_df.iterrows()):
     game = Game(game_data)
     games[game.game_id] = game
 
+players = {}
 print("parsing game details")
 for _, player_info in tqdm(details_df.iterrows()):
     player_stats = Player_Stats(player_info)
@@ -102,5 +107,12 @@ for _, player_info in tqdm(details_df.iterrows()):
         games[player_stats.game_id].add_player(1, player_stats)
     else:
         games[player_stats.game_id].add_player(0, player_stats)
-        
+    
+    p = Player(player_stats.player_id)
+    if p.player_id in players:
+        players[p.player_id].add_game(games[player_stats.game_id])
+    else:
+        p.add_game(games[player_stats.game_id])
+        players[p.player_id] = p
+
 
