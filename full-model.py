@@ -1,5 +1,6 @@
 import pandas as pd
 from tqdm import tqdm
+import torch
 
 datapath = "data/games.csv"
 games_df = pd.read_csv(datapath)
@@ -61,7 +62,7 @@ class Player_Stats:
         self.fg3_made = game_stats["FG3M"]
         self.fg3_attempts = game_stats["FG3A"]
         self.ft_made = game_stats["FTM"]
-        self.fg_attempts = game_stats["FTA"]
+        self.ft_attempts = game_stats["FTA"]
         self.off_reb = game_stats["OREB"]
         self.def_reb = game_stats["DREB"]
         self.assists = game_stats["AST"]
@@ -76,19 +77,20 @@ class Player_Stats:
         Need to add the following data values:
         1) Game date
         2) Home/away team playoff buffer (games ahead or back)
-        3) Playoff game (binary value)
-        4) Time since last game played
-        5) Pre game ELO
-        The date values are mostly corrupted in our data files so we
-        can't access them.
-        Pre game ELO values are updated as the model trains. The original
-        values could be read in from our baseline model.
+        3) Time since last game played
         """
+        
+class Rating:
+    def __init__(self, stats):
+        self.date = stats[0]
+        self.stat1 = stats[1]
+        self.stat2 = stats[2]
         
 class Player:
     def __init__(self, player_id):
         self.player_id = player_id
-        self.games = []
+        self.games = [] # SM - use a sorted map
+        self.ratings = [] # RB - Update this as we train
         
     def add_game(self, game):
         self.games.append(game)
@@ -115,4 +117,15 @@ for _, player_info in tqdm(details_df.iterrows()):
         p.add_game(games[player_stats.game_id])
         players[p.player_id] = p
 
-
+num_games = len(games)
+num_players = len(players)
+players_per_game = 48
+num_stats = 32
+rating_size = 32
+lookahead = 8
+games_ten = torch.zeros((num_games, players_per_game, num_stats), dtype = torch.float32)
+player_rating = torch.zeros((num_players, rating_size), dtype = torch.float32) # SM - don't need to update this now
+game_to_player_map = torch.zeros((num_games, num_players), dtype = torch.long) # references player_rating tensor
+"labels should use from each player the next 'lookahead' games"
+labels = torch.zeros((num_games, players_per_game, lookahead), dtype = torch.float32) # references games_ten
+masks = torch.zeros((num_games, players_per_game), dtype = torch.float32)
