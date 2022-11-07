@@ -11,6 +11,10 @@ details_df = pd.read_csv(datapath)
 
 class Game:
     def __init__(self, game):
+        game_date = game["GAME_DATE_EST"].split("-")
+        self.game_year = int(game_date[0])
+        self.game_month = int(game_date[1])
+        self.game_day = int(game_date[2])
         self.game_id = game["GAME_ID"]
         self.home_team_id = game["HOME_TEAM_ID"]
         self.away_team_id = game["VISITOR_TEAM_ID"]
@@ -46,7 +50,18 @@ class Player_Stats:
         self.game_id = game_stats["GAME_ID"]
         self.player_id = game_stats["PLAYER_ID"]
         self.team_id = game_stats["TEAM_ID"]
-        self.start_position = game_stats["START_POSITION"]
+        
+        pos = game_stats["START_POSITION"]
+        if pd.isnull(pos):
+            self.start_position = -1
+        elif pos == "F":
+            self.start_position = 1
+        elif pos == "C":
+            self.start_position = 2
+        elif pos == "G":
+            self.start_position = 3
+        else:
+            print("error:", pos)
         
         time_played = game_stats["MIN"]
         if isinstance(time_played, float):
@@ -72,12 +87,12 @@ class Player_Stats:
         self.fouls = game_stats["PF"]
         self.points = game_stats["PTS"]
         self.plus_minus = game_stats["PLUS_MINUS"]
+        self.previous_game = 0
         
         """
         Need to add the following data values:
-        1) Game date
-        2) Home/away team playoff buffer (games ahead or back)
-        3) Time since last game played
+        1) Home/away team playoff buffer (games ahead or back)
+        2) Time since last game played
         """
         
 class Rating:
@@ -106,6 +121,9 @@ print("parsing game details")
 for _, player_info in tqdm(details_df.iterrows()):
     player_stats = Player_Stats(player_info)
     if games[player_stats.game_id].home_team_id == player_stats.team_id:
+        if player_stats.player_id in players:
+            last_game = players[player_stats.player_id].games[len(players[player_stats.player_id].games) - 1]
+            #print(last_game.game_year)
         games[player_stats.game_id].add_player(1, player_stats)
     else:
         games[player_stats.game_id].add_player(0, player_stats)
@@ -129,3 +147,53 @@ game_to_player_map = torch.zeros((num_games, num_players), dtype = torch.long) #
 "labels should use from each player the next 'lookahead' games"
 labels = torch.zeros((num_games, players_per_game, lookahead), dtype = torch.float32) # references games_ten
 masks = torch.zeros((num_games, players_per_game), dtype = torch.float32)
+
+for game_index, game in tqdm(enumerate(games.values())):
+    for player_index, player_stats in enumerate(game.home_players_stats):
+        games_ten[game_index][player_index][0] = game.game_year
+        games_ten[game_index][player_index][1] = game.game_month
+        games_ten[game_index][player_index][2] = game.game_day
+        games_ten[game_index][player_index][3] = player_stats.game_id
+        games_ten[game_index][player_index][4] = player_stats.player_id
+        games_ten[game_index][player_index][5] = player_stats.team_id
+        games_ten[game_index][player_index][6] = player_stats.start_position
+        games_ten[game_index][player_index][7] = player_stats.seconds_played
+        games_ten[game_index][player_index][8] = player_stats.fg_made
+        games_ten[game_index][player_index][9] = player_stats.fg_attempts
+        games_ten[game_index][player_index][10] = player_stats.fg3_made
+        games_ten[game_index][player_index][11] = player_stats.fg3_attempts
+        games_ten[game_index][player_index][12] = player_stats.ft_made
+        games_ten[game_index][player_index][13] = player_stats.ft_attempts
+        games_ten[game_index][player_index][14] = player_stats.off_reb
+        games_ten[game_index][player_index][15] = player_stats.def_reb
+        games_ten[game_index][player_index][16] = player_stats.assists
+        games_ten[game_index][player_index][17] = player_stats.steals
+        games_ten[game_index][player_index][18] = player_stats.blocks
+        games_ten[game_index][player_index][19] = player_stats.turnovers
+        games_ten[game_index][player_index][20] = player_stats.fouls
+        games_ten[game_index][player_index][21] = player_stats.points
+        games_ten[game_index][player_index][22] = player_stats.plus_minus
+    for player_index, player_stats in enumerate(game.away_players_stats):
+        games_ten[game_index][player_index + int(players_per_game/2)][0] = game.game_year
+        games_ten[game_index][player_index + int(players_per_game/2)][1] = game.game_month
+        games_ten[game_index][player_index + int(players_per_game/2)][2] = game.game_day
+        games_ten[game_index][player_index + int(players_per_game/2)][3] = player_stats.game_id
+        games_ten[game_index][player_index + int(players_per_game/2)][4] = player_stats.player_id
+        games_ten[game_index][player_index + int(players_per_game/2)][5] = player_stats.team_id
+        games_ten[game_index][player_index + int(players_per_game/2)][6] = player_stats.start_position
+        games_ten[game_index][player_index + int(players_per_game/2)][7] = player_stats.seconds_played
+        games_ten[game_index][player_index + int(players_per_game/2)][8] = player_stats.fg_made
+        games_ten[game_index][player_index + int(players_per_game/2)][9] = player_stats.fg_attempts
+        games_ten[game_index][player_index + int(players_per_game/2)][10] = player_stats.fg3_made
+        games_ten[game_index][player_index + int(players_per_game/2)][11] = player_stats.fg3_attempts
+        games_ten[game_index][player_index + int(players_per_game/2)][12] = player_stats.ft_made
+        games_ten[game_index][player_index + int(players_per_game/2)][13] = player_stats.ft_attempts
+        games_ten[game_index][player_index + int(players_per_game/2)][14] = player_stats.off_reb
+        games_ten[game_index][player_index + int(players_per_game/2)][15] = player_stats.def_reb
+        games_ten[game_index][player_index + int(players_per_game/2)][16] = player_stats.assists
+        games_ten[game_index][player_index + int(players_per_game/2)][17] = player_stats.steals
+        games_ten[game_index][player_index + int(players_per_game/2)][18] = player_stats.blocks
+        games_ten[game_index][player_index + int(players_per_game/2)][19] = player_stats.turnovers
+        games_ten[game_index][player_index + int(players_per_game/2)][20] = player_stats.fouls
+        games_ten[game_index][player_index + int(players_per_game/2)][21] = player_stats.points
+        games_ten[game_index][player_index + int(players_per_game/2)][22] = player_stats.plus_minus
