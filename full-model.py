@@ -9,6 +9,10 @@ games_df.sort_values(by="GAME_DATE_EST", inplace=True)
 datapath = "data/games_details.csv"
 details_df = pd.read_csv(datapath)
 
+datapath = "data/ranking.csv"
+rankings_df = pd.read_csv(datapath)
+rankings_df.sort_values(by="STANDINGSDATE", inplace=True)
+
 class Game:
     def __init__(self, game):
         game_date = game["GAME_DATE_EST"].split("-")
@@ -30,6 +34,10 @@ class Game:
         self.assist_away = game["AST_away"]
         self.rebound_home = game["REB_home"]
         self.rebound_away = game["REB_away"]
+        self.home_team_wins = 0
+        self.home_team_losses = 0
+        self.away_team_wins = 0
+        self.away_team_losses = 0
         
         if self.home_points == self.away_points:
             self.home_wins = .5
@@ -89,12 +97,6 @@ class Player_Stats:
         self.plus_minus = game_stats["PLUS_MINUS"]
         self.previous_game = 0
         
-        """
-        Need to add the following data values:
-        1) Home/away team playoff buffer (games ahead or back)
-        2) Time since last game played
-        """
-        
 class Rating:
     def __init__(self, stats):
         self.date = stats[0]
@@ -110,10 +112,43 @@ class Player:
     def add_game(self, game):
         self.games.append(game)
         
+def diff_days(game1, game2):
+    year1 = game1.game_year
+    month1 = game1.game_month
+    day1 = game1.game_day
+    year2 = game2.game_year
+    month2 = game2.game_month
+    day2 = game2.game_day
+    
+    # RB - Simple estimate, get exact values later
+    diff = 365 * (year2 - year1) + 30 * (month2 - month1) + (day2 - day1)
+    return diff
+        
+print("parsing rankings")
+rankings = {}
+for _, ranking_data in tqdm(rankings_df.iterrows()):
+    ranking_date = ranking_data["STANDINGSDATE"].split("-")
+    year = int(ranking_date[0])
+    month = int(ranking_date[1])
+    day = int(ranking_date[2])
+    if (year, month, day) in rankings:
+        rankings[(year, month, day)].append((ranking_data["TEAM_ID"], ranking_data["W"], ranking_data["L"]))
+    else:
+        rankings[(year, month, day)] = []
+        rankings[(year, month, day)].append((ranking_data["TEAM_ID"], ranking_data["W"], ranking_data["L"]))
+
 print("parsing games")
 games = {}
 for _, game_data in tqdm(games_df.iterrows()):
     game = Game(game_data)
+    if (game.game_year, game.game_month, game.game_day) in rankings:
+        for r in rankings[(game.game_year, game.game_month, game.game_day)]:
+            if r[0] == game.home_team_id:
+                game.home_team_wins = r[1]
+                game.home_team_losses = r[2]
+            if r[0] == game.away_team_id:
+                game.away_team_wins = r[1]
+                game.away_team_losses = r[2]
     games[game.game_id] = game
 
 players = {}
@@ -123,7 +158,10 @@ for _, player_info in tqdm(details_df.iterrows()):
     if games[player_stats.game_id].home_team_id == player_stats.team_id:
         if player_stats.player_id in players:
             last_game = players[player_stats.player_id].games[len(players[player_stats.player_id].games) - 1]
-            #print(last_game.game_year)
+            days = diff_days(last_game, games[player_stats.game_id])
+            player_stats.previous_game = days
+        else:
+            player_stats.previous_game = -1
         games[player_stats.game_id].add_player(1, player_stats)
     else:
         games[player_stats.game_id].add_player(0, player_stats)
@@ -148,52 +186,84 @@ game_to_player_map = torch.zeros((num_games, num_players), dtype = torch.long) #
 labels = torch.zeros((num_games, players_per_game, lookahead), dtype = torch.float32) # references games_ten
 masks = torch.zeros((num_games, players_per_game), dtype = torch.float32)
 
+print("constructing games tensor")
 for game_index, game in tqdm(enumerate(games.values())):
     for player_index, player_stats in enumerate(game.home_players_stats):
         games_ten[game_index][player_index][0] = game.game_year
         games_ten[game_index][player_index][1] = game.game_month
         games_ten[game_index][player_index][2] = game.game_day
-        games_ten[game_index][player_index][3] = player_stats.game_id
-        games_ten[game_index][player_index][4] = player_stats.player_id
-        games_ten[game_index][player_index][5] = player_stats.team_id
-        games_ten[game_index][player_index][6] = player_stats.start_position
-        games_ten[game_index][player_index][7] = player_stats.seconds_played
-        games_ten[game_index][player_index][8] = player_stats.fg_made
-        games_ten[game_index][player_index][9] = player_stats.fg_attempts
-        games_ten[game_index][player_index][10] = player_stats.fg3_made
-        games_ten[game_index][player_index][11] = player_stats.fg3_attempts
-        games_ten[game_index][player_index][12] = player_stats.ft_made
-        games_ten[game_index][player_index][13] = player_stats.ft_attempts
-        games_ten[game_index][player_index][14] = player_stats.off_reb
-        games_ten[game_index][player_index][15] = player_stats.def_reb
-        games_ten[game_index][player_index][16] = player_stats.assists
-        games_ten[game_index][player_index][17] = player_stats.steals
-        games_ten[game_index][player_index][18] = player_stats.blocks
-        games_ten[game_index][player_index][19] = player_stats.turnovers
-        games_ten[game_index][player_index][20] = player_stats.fouls
-        games_ten[game_index][player_index][21] = player_stats.points
-        games_ten[game_index][player_index][22] = player_stats.plus_minus
+        games_ten[game_index][player_index][3] = game.home_team_wins
+        games_ten[game_index][player_index][4] = game.home_team_losses
+        games_ten[game_index][player_index][5] = game.away_team_wins
+        games_ten[game_index][player_index][6] = game.away_team_losses
+        games_ten[game_index][player_index][7] = player_stats.game_id
+        games_ten[game_index][player_index][8] = player_stats.player_id
+        games_ten[game_index][player_index][9] = player_stats.team_id
+        games_ten[game_index][player_index][10] = player_stats.start_position
+        games_ten[game_index][player_index][11] = player_stats.seconds_played
+        games_ten[game_index][player_index][12] = player_stats.fg_made
+        games_ten[game_index][player_index][13] = player_stats.fg_attempts
+        games_ten[game_index][player_index][14] = player_stats.fg3_made
+        games_ten[game_index][player_index][15] = player_stats.fg3_attempts
+        games_ten[game_index][player_index][16] = player_stats.ft_made
+        games_ten[game_index][player_index][17] = player_stats.ft_attempts
+        games_ten[game_index][player_index][18] = player_stats.off_reb
+        games_ten[game_index][player_index][19] = player_stats.def_reb
+        games_ten[game_index][player_index][20] = player_stats.assists
+        games_ten[game_index][player_index][21] = player_stats.steals
+        games_ten[game_index][player_index][22] = player_stats.blocks
+        games_ten[game_index][player_index][23] = player_stats.turnovers
+        games_ten[game_index][player_index][24] = player_stats.fouls
+        games_ten[game_index][player_index][25] = player_stats.points
+        games_ten[game_index][player_index][26] = player_stats.plus_minus
+        games_ten[game_index][player_index][27] = player_stats.previous_game
     for player_index, player_stats in enumerate(game.away_players_stats):
         games_ten[game_index][player_index + int(players_per_game/2)][0] = game.game_year
         games_ten[game_index][player_index + int(players_per_game/2)][1] = game.game_month
         games_ten[game_index][player_index + int(players_per_game/2)][2] = game.game_day
-        games_ten[game_index][player_index + int(players_per_game/2)][3] = player_stats.game_id
-        games_ten[game_index][player_index + int(players_per_game/2)][4] = player_stats.player_id
-        games_ten[game_index][player_index + int(players_per_game/2)][5] = player_stats.team_id
-        games_ten[game_index][player_index + int(players_per_game/2)][6] = player_stats.start_position
-        games_ten[game_index][player_index + int(players_per_game/2)][7] = player_stats.seconds_played
-        games_ten[game_index][player_index + int(players_per_game/2)][8] = player_stats.fg_made
-        games_ten[game_index][player_index + int(players_per_game/2)][9] = player_stats.fg_attempts
-        games_ten[game_index][player_index + int(players_per_game/2)][10] = player_stats.fg3_made
-        games_ten[game_index][player_index + int(players_per_game/2)][11] = player_stats.fg3_attempts
-        games_ten[game_index][player_index + int(players_per_game/2)][12] = player_stats.ft_made
-        games_ten[game_index][player_index + int(players_per_game/2)][13] = player_stats.ft_attempts
-        games_ten[game_index][player_index + int(players_per_game/2)][14] = player_stats.off_reb
-        games_ten[game_index][player_index + int(players_per_game/2)][15] = player_stats.def_reb
-        games_ten[game_index][player_index + int(players_per_game/2)][16] = player_stats.assists
-        games_ten[game_index][player_index + int(players_per_game/2)][17] = player_stats.steals
-        games_ten[game_index][player_index + int(players_per_game/2)][18] = player_stats.blocks
-        games_ten[game_index][player_index + int(players_per_game/2)][19] = player_stats.turnovers
-        games_ten[game_index][player_index + int(players_per_game/2)][20] = player_stats.fouls
-        games_ten[game_index][player_index + int(players_per_game/2)][21] = player_stats.points
-        games_ten[game_index][player_index + int(players_per_game/2)][22] = player_stats.plus_minus
+        games_ten[game_index][player_index + int(players_per_game/2)][3] = game.home_team_wins
+        games_ten[game_index][player_index + int(players_per_game/2)][4] = game.home_team_losses
+        games_ten[game_index][player_index + int(players_per_game/2)][5] = game.away_team_wins
+        games_ten[game_index][player_index + int(players_per_game/2)][6] = game.away_team_losses
+        games_ten[game_index][player_index + int(players_per_game/2)][7] = player_stats.game_id
+        games_ten[game_index][player_index + int(players_per_game/2)][8] = player_stats.player_id
+        games_ten[game_index][player_index + int(players_per_game/2)][9] = player_stats.team_id
+        games_ten[game_index][player_index + int(players_per_game/2)][10] = player_stats.start_position
+        games_ten[game_index][player_index + int(players_per_game/2)][11] = player_stats.seconds_played
+        games_ten[game_index][player_index + int(players_per_game/2)][12] = player_stats.fg_made
+        games_ten[game_index][player_index + int(players_per_game/2)][13] = player_stats.fg_attempts
+        games_ten[game_index][player_index + int(players_per_game/2)][14] = player_stats.fg3_made
+        games_ten[game_index][player_index + int(players_per_game/2)][15] = player_stats.fg3_attempts
+        games_ten[game_index][player_index + int(players_per_game/2)][16] = player_stats.ft_made
+        games_ten[game_index][player_index + int(players_per_game/2)][17] = player_stats.ft_attempts
+        games_ten[game_index][player_index + int(players_per_game/2)][18] = player_stats.off_reb
+        games_ten[game_index][player_index + int(players_per_game/2)][19] = player_stats.def_reb
+        games_ten[game_index][player_index + int(players_per_game/2)][20] = player_stats.assists
+        games_ten[game_index][player_index + int(players_per_game/2)][21] = player_stats.steals
+        games_ten[game_index][player_index + int(players_per_game/2)][22] = player_stats.blocks
+        games_ten[game_index][player_index + int(players_per_game/2)][23] = player_stats.turnovers
+        games_ten[game_index][player_index + int(players_per_game/2)][24] = player_stats.fouls
+        games_ten[game_index][player_index + int(players_per_game/2)][25] = player_stats.points
+        games_ten[game_index][player_index + int(players_per_game/2)][26] = player_stats.plus_minus
+        games_ten[game_index][player_index + int(players_per_game/2)][27] = player_stats.previous_game
+
+print("constructing labels")
+for game_index, game in tqdm(enumerate(games.values())):
+    for player_index, player_stats in enumerate(game.home_players_stats): # RB - Need to repead this loop for away_player_stats w/ minor differences
+        game_pos = 0
+        p_id = player_stats.player_id
+        while players[p_id].games[game_pos].game_id != game.game_id:
+            game_pos += 1
+        for i in range(lookahead):
+            if game_pos + i < len(players[p_id].games):
+                flag = False
+                for g in range(num_games - game_index):
+                    for p_ind in range((int(players_per_game/2))):
+                        if games_ten[g + game_index][p_ind][7] == players[p_id].games[game_pos].game_id and games_ten[g + game_index][p_ind][8] == p_id:
+                            labels[game_index][player_index][i] = g + game_index
+                            game_pos += 1
+                            flag = True
+                            break
+                    if flag == True:
+                        break
+                        
