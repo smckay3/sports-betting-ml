@@ -212,21 +212,23 @@ print("parsing games")
 games = {}
 for _, game_data in tqdm(games_df.iterrows()):
     game = Game(game_data)
+    if games.get(game.game_id) != None:
+        print(f"Got duplicate game id {game.game_id}")
     games[game.game_id] = game
 
-print("parsing players")
-for _, player_info in tqdm(details_df.iterrows()):
-    games[player_info["GAME_ID"]].add_player(player_info)
+# print("parsing players")
+# for _, player_info in tqdm(details_df.iterrows()):
+#     games[player_info["GAME_ID"]].add_player(player_info)
 
-print("updating player ratings")
-for game in tqdm(games.values()):
-    if game.home_team and game.away_team:
-        game.set_ratings(player_ratings)
+# print("updating player ratings")
+# for game in tqdm(games.values()):
+#     if game.home_team and game.away_team:
+#         game.set_ratings(player_ratings)
 
-"Sort players by rating"
-sorted_ratings = [v for k, v in sorted(player_ratings.items(), key = lambda item: item[1][1])]
+# "Sort players by rating"
+# sorted_ratings = [v for k, v in sorted(player_ratings.items(), key = lambda item: item[1][1])]
 
-print(sorted_ratings)
+print(len(games))
 
 #for name, rating in player_ratings.values():
     #print(name, rating)
