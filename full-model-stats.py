@@ -216,7 +216,7 @@ games_ten = torch.zeros((num_games, players_per_game, num_stats), dtype = torch.
 player_rating = torch.zeros((num_players, rating_size), dtype = torch.float32) # SM - don't need to update this now
 game_to_player_map = torch.zeros((num_games, players_per_game), dtype = torch.long) # references player_rating tensor
 "labels should use from each player the next 'lookahead' games"
-labels = torch.zeros((num_games, players_per_game, lookahead), dtype = torch.float32) # references games_ten
+labels = torch.zeros((num_games, players_per_game, lookahead), dtype = torch.long) # references games_ten
 masks = torch.zeros((num_games, players_per_game), dtype = torch.float32)
 
 player_id_to_global_player_index_map = {player_id: player_index for player_index, player_id in enumerate(players.keys())}
@@ -255,6 +255,7 @@ for game_index, game in tqdm(enumerate(games.values())):
         games_ten[game_index][player_index][26] = player_stats.points
         games_ten[game_index][player_index][27] = player_stats.plus_minus
         games_ten[game_index][player_index][28] = player_stats.previous_game
+        games_ten[game_index][player_index][29] = 1
     for player_index, player_stats in enumerate(game.away_players_stats):
         player_index = player_index + away_team_start
         game_to_player_map[game_index][player_index] = player_id_to_global_player_index_map[player_stats.player_id]
@@ -262,10 +263,10 @@ for game_index, game in tqdm(enumerate(games.values())):
         games_ten[game_index][player_index][1] = game.game_month
         games_ten[game_index][player_index][2] = game.game_day
         games_ten[game_index][player_index][3] = game.game_days_since_epoch
-        games_ten[game_index][player_index][4] = game.home_team_wins
-        games_ten[game_index][player_index][5] = game.home_team_losses
-        games_ten[game_index][player_index][6] = game.away_team_wins
-        games_ten[game_index][player_index][7] = game.away_team_losses
+        games_ten[game_index][player_index][4] = game.away_team_wins
+        games_ten[game_index][player_index][5] = game.away_team_losses
+        games_ten[game_index][player_index][6] = game.home_team_wins
+        games_ten[game_index][player_index][7] = game.home_team_losses
         games_ten[game_index][player_index][8] = player_stats.start_position
         games_ten[game_index][player_index][9] = player_stats.seconds_played
         games_ten[game_index][player_index][10] = player_stats.fg_made
@@ -287,6 +288,7 @@ for game_index, game in tqdm(enumerate(games.values())):
         games_ten[game_index][player_index][26] = player_stats.points
         games_ten[game_index][player_index][27] = player_stats.plus_minus
         games_ten[game_index][player_index][28] = player_stats.previous_game
+        games_ten[game_index][player_index][29] = -1
     
 
 print("constructing labels")
