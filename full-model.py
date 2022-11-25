@@ -37,27 +37,27 @@ games_ten_mask[4] = 1 # game.away_team_wins
 games_ten_mask[5] = 1 # game.away_team_losses
 games_ten_mask[6] = 1 # game.home_team_wins
 games_ten_mask[7] = 1 # game.home_team_losses
-# games_ten_mask[8] = player_stats.start_position
-# games_ten_mask[9] = player_stats.seconds_played
-# games_ten_mask[10] = player_stats.fg_made
-# games_ten_mask[11] = player_stats.fg_attempts
-# games_ten_mask[12] = player_stats.fg_made / player_stats.fg_attempts if player_stats.fg_attempts != 0 else 0
-# games_ten_mask[13] = player_stats.fg3_made
-# games_ten_mask[14] = player_stats.fg3_attempts
-# games_ten_mask[15] = player_stats.fg3_made / player_stats.fg3_attempts if player_stats.fg3_attempts != 0 else 0
-# games_ten_mask[16] = player_stats.ft_made
-# games_ten_mask[17] = player_stats.ft_attempts
-# games_ten_mask[18] = player_stats.ft_made / player_stats.ft_attempts if player_stats.ft_attempts != 0 else 0
-# games_ten_mask[19] = player_stats.off_reb
-# games_ten_mask[20] = player_stats.def_reb
-# games_ten_mask[21] = player_stats.assists
-# games_ten_mask[22] = player_stats.steals
-# games_ten_mask[23] = player_stats.blocks
-# games_ten_mask[24] = player_stats.turnovers
-# games_ten_mask[25] = player_stats.fouls
-# games_ten_mask[26] = player_stats.points
-# games_ten_mask[27] = player_stats.plus_minus
-games_ten_mask[28] = 1 # player_stats.previous_game
+# games_ten_mask[8] = 1 # player_stats.start_position
+# games_ten_mask[9] = 1 # player_stats.seconds_played
+# games_ten_mask[10] = 1 # player_stats.fg_made
+# games_ten_mask[11] = 1 # player_stats.fg_attempts
+# games_ten_mask[12] = 1 # player_stats.fg_made / player_stats.fg_attempts if player_stats.fg_attempts != 0 else 0
+# games_ten_mask[13] = 1 # player_stats.fg3_made
+# games_ten_mask[14] = 1 # player_stats.fg3_attempts
+# games_ten_mask[15] = 1 # player_stats.fg3_made / player_stats.fg3_attempts if player_stats.fg3_attempts != 0 else 0
+# games_ten_mask[16] = 1 # player_stats.ft_made
+# games_ten_mask[17] = 1 # player_stats.ft_attempts
+# games_ten_mask[18] = 1 # player_stats.ft_made / player_stats.ft_attempts if player_stats.ft_attempts != 0 else 0
+# games_ten_mask[19] = 1 # player_stats.off_reb
+# games_ten_mask[20] = 1 # player_stats.def_reb
+# games_ten_mask[21] = 1 # player_stats.assists
+# games_ten_mask[22] = 1 # player_stats.steals
+# games_ten_mask[23] = 1 # player_stats.blocks
+# games_ten_mask[24] = 1 # player_stats.turnovers
+# games_ten_mask[25] = 1 # player_stats.fouls
+# games_ten_mask[26] = 1 # player_stats.points
+# games_ten_mask[27] = 1 # player_stats.plus_minus
+# games_ten_mask[28] = 1 # player_stats.previous_game
 games_ten_mask[29] = 1 # home / away
 
 
@@ -100,7 +100,7 @@ class BoxScoreGenerator(nn.Module):
         print(config)
         self.linear_in = nn.Linear(rating_size + num_stats, hidden_size)
         self.bert = BertEncoder(config)
-        self.dropout = nn.Dropout(dropout)
+        # self.dropout = nn.Dropout(dropout)
         self.linear_out_means = nn.Linear(hidden_size, num_stats)
         self.linear_out_var = nn.Linear(hidden_size, num_stats)
 
@@ -116,7 +116,9 @@ class BoxScoreGenerator(nn.Module):
         mask = (1.0 - mask) * torch.finfo(torch.float32).min
 
         output, = self.bert(inputs, attention_mask=mask,return_dict=False)
-        dropout_output = self.dropout(output)
+        dropout_output = output
+        # dropout_output = self.dropout(output)
+        # dropout_output = inputs
         pred_mean = self.linear_out_means(dropout_output)
         pred_std = self.linear_out_var(dropout_output)
 
@@ -202,9 +204,10 @@ def train(ratingGenerator, boxScoreGenerator, games_ten, games_ten_mask, game_to
             masked_box_games = games_ten_mask * box_games
             pred_mean, pred_std = boxScoreGenerator(boxScoreGenRatingsInput, masked_box_games, box_masks)
 
-            # masked_box_games_output = games_ten_mask * (1 - box_games)
+            # masked_box_games_output = (1 - games_ten_mask) * box_games
             # box_loss = F.gaussian_nll_loss(pred_mean, masked_box_games_output, pred_std*pred_std)
-            box_loss = F.gaussian_nll_loss(pred_mean, box_games, pred_std*pred_std)
+            # box_loss = F.gaussian_nll_loss(pred_mean, box_games, pred_std*pred_std)
+            box_loss = F.mse_loss(pred_mean, box_games)
             train_total_box_loss += box_loss.item()
 
             non_normalized_box_score = (box_games * games_ten_std) + games_ten_mean
@@ -279,7 +282,8 @@ def train(ratingGenerator, boxScoreGenerator, games_ten, games_ten_mask, game_to
                 # print(f"{non_normalized_box_score[:, players_per_team:, 26]=}")
                 val_correct += pred_home_wins.eq(home_wins).sum().item()
 
-                box_loss = F.gaussian_nll_loss(pred_mean, batch_games, pred_std*pred_std)
+                # box_loss = F.gaussian_nll_loss(pred_mean, batch_games, pred_std*pred_std)
+                box_loss = F.mse_loss(pred_mean, batch_games)
                 val_total_box_loss += box_loss.item()
 
                 # update ratings
