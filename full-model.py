@@ -24,7 +24,7 @@ labels = labels.long()
 
 game_to_player_map += mask.long()
 
-rating_size = 32
+rating_size = 256
 num_stats = games_ten.shape[-1]
 
 games_ten_mask = torch.zeros((num_stats, ), dtype = torch.float32)
@@ -96,7 +96,7 @@ class BoxScoreGenerator(nn.Module):
     def __init__(self, rating_size, num_stats, dropout=0.5, hidden_size=128):
         super(BoxScoreGenerator, self).__init__()
 
-        config = BertConfig(hidden_size=hidden_size, intermediate_size=hidden_size*4, num_hidden_layers=4, num_attention_heads=8)
+        config = BertConfig(hidden_size=hidden_size, intermediate_size=hidden_size*4, num_hidden_layers=8, num_attention_heads=8)
         print(config)
         self.linear_in = nn.Linear(rating_size + num_stats, hidden_size)
         self.bert = BertEncoder(config)
@@ -197,7 +197,7 @@ def train(ratingGenerator, boxScoreGenerator, games_ten, games_ten_mask, game_to
             player_rating[player_indices] = new_rating
 
             rating_std, rating_mean = torch.std_mean(new_rating, dim=(0,1))
-            rating_loss = ((rating_mean * rating_mean + rating_std*rating_std - 1) / 2 - rating_std.log()).sum()
+            rating_loss = ((rating_mean * rating_mean + rating_std*rating_std - 1) / 2 - rating_std.log()).mean()
             train_total_rating_loss += rating_loss.item()
 
             boxScoreGenRatingsInput = player_rating[box_player_indices]
@@ -292,7 +292,7 @@ def train(ratingGenerator, boxScoreGenerator, games_ten, games_ten_mask, game_to
                 new_rating = player_rating[player_indices] + player_mask.unsqueeze(-1) * rating_change
                 player_rating[player_indices] = new_rating
                 rating_std, rating_mean = torch.std_mean(new_rating, dim=(0,1))
-                rating_loss = ((rating_mean * rating_mean + rating_std*rating_std - 1) / 2 - rating_std.log()).sum()
+                rating_loss = ((rating_mean * rating_mean + rating_std*rating_std - 1) / 2 - rating_std.log()).mean()
                 val_total_rating_loss += rating_loss.item()
 
         # print(f"{player_rating[0:32]=}")
@@ -305,6 +305,6 @@ def train(ratingGenerator, boxScoreGenerator, games_ten, games_ten_mask, game_to
 ratingGenerator = RatingGenerator(rating_size, num_stats, hidden_size=128)
 boxScoreGenerator = BoxScoreGenerator(rating_size, num_stats, hidden_size=128)
 
-EPOCHS = 100
+EPOCHS = 200
 LR = 1e-4
 train(ratingGenerator, boxScoreGenerator, games_ten, games_ten_mask, game_to_player_map, labels, mask, LR, EPOCHS, mean, std)
