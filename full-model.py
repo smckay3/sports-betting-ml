@@ -1,5 +1,5 @@
 import torch
-from torch.optim import Adam
+from torch.optim import AdamW
 from torch import nn
 import torch.nn.functional as F
 from tqdm import tqdm
@@ -63,7 +63,7 @@ games_ten_mask[29] = 1 # home / away
 
 class RatingGenerator(nn.Module):
 
-    def __init__(self, rating_size, num_stats, dropout=0.5, hidden_size=128):
+    def __init__(self, rating_size, num_stats, dropout=0.0, hidden_size=128):
         super(RatingGenerator, self).__init__()
 
         config = BertConfig(hidden_size=hidden_size, intermediate_size=hidden_size*4, num_hidden_layers=4, num_attention_heads=8)
@@ -129,7 +129,7 @@ def train(ratingGenerator, boxScoreGenerator, games_ten, games_ten_mask, game_to
     use_cuda = torch.cuda.is_available()
     device = torch.device("cuda" if use_cuda else "cpu")
 
-    optimizer = Adam(list(ratingGenerator.parameters()) + list(boxScoreGenerator.parameters()), lr=learning_rate)
+    optimizer = AdamW(list(ratingGenerator.parameters()) + list(boxScoreGenerator.parameters()), lr=learning_rate, weight_decay=1e-4)
     if use_cuda:
         ratingGenerator = ratingGenerator.cuda()
         boxScoreGenerator = boxScoreGenerator.cuda()
@@ -256,6 +256,22 @@ def train(ratingGenerator, boxScoreGenerator, games_ten, games_ten_mask, game_to
         ratingGenerator.eval()
         boxScoreGenerator.eval()
         with torch.no_grad():
+            # regenerate ratings without dropout running
+            # player_rating = torch.zeros((num_players, rating_size), dtype = torch.float32, device=device)
+            # for batch_index in tqdm(range(num_train_batches)):
+            #     start_index = batch_index * rating_batch_size
+            #     end_index = (batch_index+1) * rating_batch_size
+            #     batch_games = val_games[start_index:end_index]
+            #     player_indices = val_game_to_player_map[start_index:end_index]
+            #     player_mask = val_mask[start_index:end_index]
+            #     ratings = player_rating[player_indices]
+
+            #     # update ratings
+            #     rating_change = ratingGenerator(ratings, batch_games, player_mask)
+            #     # new_rating = player_mask.unsqueeze(-1) * rating_change
+            #     new_rating = player_rating[player_indices] + player_mask.unsqueeze(-1) * rating_change
+            #     player_rating[player_indices] = new_rating
+
             for batch_index in tqdm(range(num_val_batches)):
                 start_index = batch_index * rating_batch_size
                 end_index = (batch_index+1) * rating_batch_size
