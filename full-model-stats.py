@@ -134,7 +134,6 @@ def diff_days(game1, game2):
     year2 = game2.game_year
     month2 = game2.game_month
     day2 = game2.game_day
-    # RB - Simple estimate, get exact values later
     diff = (datetime.datetime(year2, month2, day2) - datetime.datetime(year1, month1, day1)).days
     return diff
 
@@ -142,6 +141,9 @@ everything_path = "everything.pickle"
 rankings = {}
 games = {}
 players = {}
+last_season = 0
+season_start = []
+team_rankings = {}
 if not os.path.exists(everything_path):
     print("parsing rankings")
     for _, ranking_data in tqdm(rankings_df.iterrows()):
@@ -149,15 +151,101 @@ if not os.path.exists(everything_path):
         year = int(ranking_date[0])
         month = int(ranking_date[1])
         day = int(ranking_date[2])
+        
+        "RANKINGS: Collect season start dates"
+        season = ranking_data["SEASON_ID"]
+        season = season - int(season/10000) * 10000
+        if season != last_season:
+            season_start.append((year, month, day))
+        last_season = season
+        
         if (year, month, day) in rankings:
             rankings[(year, month, day)].append((ranking_data["TEAM_ID"], ranking_data["W"], ranking_data["L"]))
         else:
             rankings[(year, month, day)] = []
             rankings[(year, month, day)].append((ranking_data["TEAM_ID"], ranking_data["W"], ranking_data["L"]))
+    
+    "RANKINGS: Simple fix for index out of bounds error"
+    season_start.append((2100, 1, 1))
 
     print("parsing games")
+    season_index = 0
     for _, game_data in tqdm(games_df.iterrows()):
         game = Game(game_data)
+        "RANKINGS: Reset rankings for all teams at start of season. This is so ugly."
+        if (datetime.datetime(game.game_year, game.game_month, game.game_day) - datetime.datetime(season_start[season_index][0], season_start[season_index][1], season_start[season_index][2])).days >= 0:
+            team_rankings = {}
+            season_index += 1
+            if game.home_team_id in team_rankings:
+                if game.away_team_id in team_rankings:
+                    if game.home_points > game.away_points:
+                        team_rankings[game.home_team_id] += 1
+                    elif game.home_points < game.away_points:
+                        team_rankings[game.away_team_id] += 1
+                    else:
+                        team_rankings[game.home_team_id] += .5
+                        team_rankings[game.away_team_id] += .5
+                else:
+                    if game.home_points > game.away_points:
+                        team_rankings[game.home_team_id] += 1
+                    elif game.home_points < game.away_points:
+                        team_rankings[game.away_team_id] = 1
+                    else:
+                        team_rankings[game.home_team_id] += .5
+                        team_rankings[game.away_team_id] = .5
+            else:
+                if game.away_team_id in team_rankings:
+                    if game.home_points > game.away_points:
+                        team_rankings[game.home_team_id] = 1
+                    elif game.home_points < game.away_points:
+                        team_rankings[game.away_team_id] += 1
+                    else:
+                        team_rankings[game.home_team_id] = .5
+                        team_rankings[game.away_team_id] += .5
+                else:
+                    if game.home_points > game.away_points:
+                        team_rankings[game.home_team_id] = 1
+                    elif game.home_points < game.away_points:
+                        team_rankings[game.away_team_id] = 1
+                    else:
+                        team_rankings[game.home_team_id] = .5
+                        team_rankings[game.away_team_id] = .5
+        else:
+            if game.home_team_id in team_rankings:
+                if game.away_team_id in team_rankings:
+                    if game.home_points > game.away_points:
+                        team_rankings[game.home_team_id] += 1
+                    elif game.home_points < game.away_points:
+                        team_rankings[game.away_team_id] += 1
+                    else:
+                        team_rankings[game.home_team_id] += .5
+                        team_rankings[game.away_team_id] += .5
+                else:
+                    if game.home_points > game.away_points:
+                        team_rankings[game.home_team_id] += 1
+                    elif game.home_points < game.away_points:
+                        team_rankings[game.away_team_id] = 1
+                    else:
+                        team_rankings[game.home_team_id] += .5
+                        team_rankings[game.away_team_id] = .5
+            else:
+                if game.away_team_id in team_rankings:
+                    if game.home_points > game.away_points:
+                        team_rankings[game.home_team_id] = 1
+                    elif game.home_points < game.away_points:
+                        team_rankings[game.away_team_id] += 1
+                    else:
+                        team_rankings[game.home_team_id] = .5
+                        team_rankings[game.away_team_id] += .5
+                else:
+                    if game.home_points > game.away_points:
+                        team_rankings[game.home_team_id] = 1
+                    elif game.home_points < game.away_points:
+                        team_rankings[game.away_team_id] = 1
+                    else:
+                        team_rankings[game.home_team_id] = .5
+                        team_rankings[game.away_team_id] = .5
+        """
         if (game.game_year, game.game_month, game.game_day) in rankings:
             for r in rankings[(game.game_year, game.game_month, game.game_day)]:
                 if r[0] == game.home_team_id:
@@ -166,6 +254,7 @@ if not os.path.exists(everything_path):
                 if r[0] == game.away_team_id:
                     game.away_team_wins = r[1]
                     game.away_team_losses = r[2]
+        """
         games[game.game_id] = game
 
     print("parsing game details")
