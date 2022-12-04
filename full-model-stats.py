@@ -179,72 +179,93 @@ if not os.path.exists(everything_path):
             if game.home_team_id in team_rankings:
                 if game.away_team_id in team_rankings:
                     if game.home_points > game.away_points:
-                        team_rankings[game.home_team_id] += 1
+                        team_rankings[game.home_team_id] += (1, 0)
+                        team_rankings[game.away_team_id] += (0, 1)
                     elif game.home_points < game.away_points:
-                        team_rankings[game.away_team_id] += 1
+                        team_rankings[game.home_team_id] += (0, 1)
+                        team_rankings[game.away_team_id] += (1, 0)
                     else:
-                        team_rankings[game.home_team_id] += .5
-                        team_rankings[game.away_team_id] += .5
+                        team_rankings[game.home_team_id] += (.5, .5)
+                        team_rankings[game.away_team_id] += (.5, .5)
                 else:
                     if game.home_points > game.away_points:
-                        team_rankings[game.home_team_id] += 1
+                        team_rankings[game.home_team_id] += (1, 0)
+                        team_rankings[game.away_team_id] = (0, 1)
                     elif game.home_points < game.away_points:
-                        team_rankings[game.away_team_id] = 1
+                        team_rankings[game.home_team_id] += (0, 1)
+                        team_rankings[game.away_team_id] = (1, 0)
                     else:
-                        team_rankings[game.home_team_id] += .5
-                        team_rankings[game.away_team_id] = .5
+                        team_rankings[game.home_team_id] += (.5, .5)
+                        team_rankings[game.away_team_id] = (.5, .5)
             else:
                 if game.away_team_id in team_rankings:
                     if game.home_points > game.away_points:
-                        team_rankings[game.home_team_id] = 1
+                        team_rankings[game.home_team_id] = (1, 0)
+                        team_rankings[game.away_team_id] += (0, 1)
                     elif game.home_points < game.away_points:
-                        team_rankings[game.away_team_id] += 1
+                        team_rankings[game.home_team_id] = (0, 1)
+                        team_rankings[game.away_team_id] += (1, 0)
                     else:
-                        team_rankings[game.home_team_id] = .5
-                        team_rankings[game.away_team_id] += .5
+                        team_rankings[game.home_team_id] = (.5, .5)
+                        team_rankings[game.away_team_id] += (.5, .5)
                 else:
                     if game.home_points > game.away_points:
-                        team_rankings[game.home_team_id] = 1
+                        team_rankings[game.home_team_id] = (1, 0)
+                        team_rankings[game.away_team_id] = (0, 1)
                     elif game.home_points < game.away_points:
-                        team_rankings[game.away_team_id] = 1
+                        team_rankings[game.home_team_id] = (0, 1)
+                        team_rankings[game.away_team_id] = (1, 0)
                     else:
-                        team_rankings[game.home_team_id] = .5
-                        team_rankings[game.away_team_id] = .5
+                        team_rankings[game.home_team_id] = (.5, .5)
+                        team_rankings[game.away_team_id] = (.5, .5)
         else:
             if game.home_team_id in team_rankings:
                 if game.away_team_id in team_rankings:
                     if game.home_points > game.away_points:
-                        team_rankings[game.home_team_id] += 1
+                        team_rankings[game.home_team_id] += (1, 0)
+                        team_rankings[game.away_team_id] += (0, 1)
                     elif game.home_points < game.away_points:
-                        team_rankings[game.away_team_id] += 1
+                        team_rankings[game.home_team_id] += (0, 1)
+                        team_rankings[game.away_team_id] += (1, 0)
                     else:
-                        team_rankings[game.home_team_id] += .5
-                        team_rankings[game.away_team_id] += .5
+                        team_rankings[game.home_team_id] += (.5, .5)
+                        team_rankings[game.away_team_id] += (.5, .5)
                 else:
                     if game.home_points > game.away_points:
-                        team_rankings[game.home_team_id] += 1
+                        team_rankings[game.home_team_id] += (1, 0)
+                        team_rankings[game.away_team_id] = (0, 1)
                     elif game.home_points < game.away_points:
-                        team_rankings[game.away_team_id] = 1
+                        team_rankings[game.home_team_id] += (0, 1)
+                        team_rankings[game.away_team_id] = (1, 0)
                     else:
-                        team_rankings[game.home_team_id] += .5
-                        team_rankings[game.away_team_id] = .5
+                        team_rankings[game.home_team_id] += (.5, .5)
+                        team_rankings[game.away_team_id] = (.5, .5)
             else:
                 if game.away_team_id in team_rankings:
                     if game.home_points > game.away_points:
-                        team_rankings[game.home_team_id] = 1
+                        team_rankings[game.home_team_id] = (1, 0)
+                        team_rankings[game.away_team_id] += (0, 1)
                     elif game.home_points < game.away_points:
-                        team_rankings[game.away_team_id] += 1
+                        team_rankings[game.home_team_id] = (0, 1)
+                        team_rankings[game.away_team_id] += (1, 0)
                     else:
-                        team_rankings[game.home_team_id] = .5
-                        team_rankings[game.away_team_id] += .5
+                        team_rankings[game.home_team_id] = (.5, .5)
+                        team_rankings[game.away_team_id] += (.5, .5)
                 else:
                     if game.home_points > game.away_points:
-                        team_rankings[game.home_team_id] = 1
+                        team_rankings[game.home_team_id] = (1, 0)
+                        team_rankings[game.away_team_id] = (0, 1)
                     elif game.home_points < game.away_points:
-                        team_rankings[game.away_team_id] = 1
+                        team_rankings[game.home_team_id] = (0, 1)
+                        team_rankings[game.away_team_id] = (1, 0)
                     else:
-                        team_rankings[game.home_team_id] = .5
-                        team_rankings[game.away_team_id] = .5
+                        team_rankings[game.home_team_id] = (.5, .5)
+                        team_rankings[game.away_team_id] = (.5, .5)
+        "RANKINGS: Set wins/losses"
+        game.home_team_wins = team_rankings[game.home_team_id][0]
+        game.home_team_losses = team_rankings[game.home_team_id][1]
+        game.away_team_wins = team_rankings[game.away_team_id][0]
+        game.away_team_losses = team_rankings[game.away_team_id][1]
         """
         if (game.game_year, game.game_month, game.game_day) in rankings:
             for r in rankings[(game.game_year, game.game_month, game.game_day)]:
