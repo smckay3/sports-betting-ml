@@ -57,8 +57,41 @@ games_ten_mask[7] = 1 # game.home_team_losses
 # games_ten_mask[25] = 1 # player_stats.fouls
 # games_ten_mask[26] = 1 # player_stats.points
 # games_ten_mask[27] = 1 # player_stats.plus_minus
-# games_ten_mask[28] = 1 # player_stats.previous_game
+games_ten_mask[28] = 1 # player_stats.previous_game
 games_ten_mask[29] = 1 # home / away
+
+games_ten_mask_output = torch.zeros((num_stats, ), dtype = torch.float32)
+
+games_ten_mask_output[0] = 1 # game.game_year
+games_ten_mask_output[1] = 1 # game.game_month
+games_ten_mask_output[2] = 1 # game.game_day
+games_ten_mask_output[3] = 1 # game.game_days_since_epoch
+games_ten_mask_output[4] = 1 # game.away_team_wins
+games_ten_mask_output[5] = 1 # game.away_team_losses
+games_ten_mask_output[6] = 1 # game.home_team_wins
+games_ten_mask_output[7] = 1 # game.home_team_losses
+games_ten_mask_output[8] = 1 # player_stats.start_position
+games_ten_mask_output[9] = 1 # player_stats.seconds_played
+games_ten_mask_output[10] = 1 # player_stats.fg_made
+games_ten_mask_output[11] = 1 # player_stats.fg_attempts
+games_ten_mask_output[12] = 1 # player_stats.fg_made / player_stats.fg_attempts if player_stats.fg_attempts != 0 else 0
+games_ten_mask_output[13] = 1 # player_stats.fg3_made
+games_ten_mask_output[14] = 1 # player_stats.fg3_attempts
+games_ten_mask_output[15] = 1 # player_stats.fg3_made / player_stats.fg3_attempts if player_stats.fg3_attempts != 0 else 0
+games_ten_mask_output[16] = 1 # player_stats.ft_made
+games_ten_mask_output[17] = 1 # player_stats.ft_attempts
+games_ten_mask_output[18] = 1 # player_stats.ft_made / player_stats.ft_attempts if player_stats.ft_attempts != 0 else 0
+games_ten_mask_output[19] = 1 # player_stats.off_reb
+games_ten_mask_output[20] = 1 # player_stats.def_reb
+games_ten_mask_output[21] = 1 # player_stats.assists
+games_ten_mask_output[22] = 1 # player_stats.steals
+games_ten_mask_output[23] = 1 # player_stats.blocks
+games_ten_mask_output[24] = 1 # player_stats.turnovers
+games_ten_mask_output[25] = 1 # player_stats.fouls
+games_ten_mask_output[26] = 1 # player_stats.points
+games_ten_mask_output[27] = 1 # player_stats.plus_minus
+games_ten_mask_output[28] = 1 # player_stats.previous_game
+games_ten_mask_output[29] = 1 # home / away
 
 
 class RatingGenerator(nn.Module):
@@ -125,7 +158,7 @@ class BoxScoreGenerator(nn.Module):
         return pred_mean, pred_std
 
 
-def train(ratingGenerator, boxScoreGenerator, games_ten, games_ten_mask, game_to_player_map, labels, mask, learning_rate, epochs, games_ten_mean, games_ten_std):
+def train(ratingGenerator, boxScoreGenerator, games_ten, games_ten_mask, games_ten_mask_output, game_to_player_map, labels, mask, learning_rate, epochs, games_ten_mean, games_ten_std):
     use_cuda = torch.cuda.is_available()
     device = torch.device("cuda" if use_cuda else "cpu")
 
@@ -137,6 +170,7 @@ def train(ratingGenerator, boxScoreGenerator, games_ten, games_ten_mask, game_to
         games_ten_mean = games_ten_mean.cuda()
         games_ten_std = games_ten_std.cuda()
         games_ten_mask = games_ten_mask.cuda()
+        games_ten_mask_output = games_ten_mask_output.cuda()
         game_to_player_map = game_to_player_map.cuda()
         labels = labels.cuda()
         mask = mask.cuda()
@@ -204,10 +238,10 @@ def train(ratingGenerator, boxScoreGenerator, games_ten, games_ten_mask, game_to
             masked_box_games = games_ten_mask * box_games
             pred_mean, pred_std = boxScoreGenerator(boxScoreGenRatingsInput, masked_box_games, box_masks)
 
-            # masked_box_games_output = (1 - games_ten_mask) * box_games
+            masked_box_games_output = games_ten_mask_output * box_games
             # box_loss = F.gaussian_nll_loss(pred_mean, masked_box_games_output, pred_std*pred_std)
             # box_loss = F.gaussian_nll_loss(pred_mean, box_games, pred_std*pred_std)
-            box_loss = F.mse_loss(pred_mean, box_games)
+            box_loss = F.mse_loss(pred_mean, masked_box_games_output)
             train_total_box_loss += box_loss.item()
 
             non_normalized_box_score = (box_games * games_ten_std) + games_ten_mean
@@ -298,8 +332,9 @@ def train(ratingGenerator, boxScoreGenerator, games_ten, games_ten_mask, game_to
                 # print(f"{non_normalized_box_score[:, players_per_team:, 26]=}")
                 val_correct += pred_home_wins.eq(home_wins).sum().item()
 
+                masked_box_games_output = games_ten_mask_output * batch_games
                 # box_loss = F.gaussian_nll_loss(pred_mean, batch_games, pred_std*pred_std)
-                box_loss = F.mse_loss(pred_mean, batch_games)
+                box_loss = F.mse_loss(pred_mean, masked_box_games_output)
                 val_total_box_loss += box_loss.item()
 
                 # update ratings
@@ -321,6 +356,6 @@ def train(ratingGenerator, boxScoreGenerator, games_ten, games_ten_mask, game_to
 ratingGenerator = RatingGenerator(rating_size, num_stats, hidden_size=128)
 boxScoreGenerator = BoxScoreGenerator(rating_size, num_stats, hidden_size=128)
 
-EPOCHS = 200
+EPOCHS = 600
 LR = 1e-4
-train(ratingGenerator, boxScoreGenerator, games_ten, games_ten_mask, game_to_player_map, labels, mask, LR, EPOCHS, mean, std)
+train(ratingGenerator, boxScoreGenerator, games_ten, games_ten_mask, games_ten_mask_output, game_to_player_map, labels, mask, LR, EPOCHS, mean, std)
