@@ -29,10 +29,10 @@ num_stats = games_ten.shape[-1]
 
 games_ten_mask = torch.zeros((num_stats, ), dtype = torch.float32)
 
-games_ten_mask[0] = 1 # game.game_year
+# games_ten_mask[0] = 1 # game.game_year
 games_ten_mask[1] = 1 # game.game_month
 games_ten_mask[2] = 1 # game.game_day
-games_ten_mask[3] = 1 # game.game_days_since_epoch
+# games_ten_mask[3] = 1 # game.game_days_since_epoch
 games_ten_mask[4] = 1 # game.away_team_wins
 games_ten_mask[5] = 1 # game.away_team_losses
 games_ten_mask[6] = 1 # game.home_team_wins
