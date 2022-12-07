@@ -172,7 +172,20 @@ if not os.path.exists(everything_path):
     season_index = 0
     for _, game_data in tqdm(games_df.iterrows()):
         game = Game(game_data)
-        "RANKINGS: Reset rankings for all teams at start of season. This is so ugly."
+        "RANKINGS: Set wins/losses"
+        if game.home_team_id in team_rankings:
+            game.home_team_wins = team_rankings[game.home_team_id][0]
+            game.home_team_losses = team_rankings[game.home_team_id][1]
+        else:
+            game.home_team_wins = 0
+            game.home_team_losses = 0
+        if game.away_team_id in team_rankings:
+            game.away_team_wins = team_rankings[game.away_team_id][0]
+            game.away_team_losses = team_rankings[game.away_team_id][1]
+        else:
+            game.away_team_wins = 0
+            game.away_team_losses = 0
+        "RANKINGS: Reset rankings for all teams at start of season."
         if (datetime.datetime(game.game_year, game.game_month, game.game_day) - datetime.datetime(season_start[season_index][0], season_start[season_index][1], season_start[season_index][2])).days >= 0:
             team_rankings = {}
             season_index += 1
@@ -232,21 +245,6 @@ if not os.path.exists(everything_path):
                     else:
                         team_rankings[game.home_team_id] = [.5, .5]
                         team_rankings[game.away_team_id] = [.5, .5]
-        "RANKINGS: Set wins/losses"
-        game.home_team_wins = team_rankings[game.home_team_id][0]
-        game.home_team_losses = team_rankings[game.home_team_id][1]
-        game.away_team_wins = team_rankings[game.away_team_id][0]
-        game.away_team_losses = team_rankings[game.away_team_id][1]
-        """
-        if (game.game_year, game.game_month, game.game_day) in rankings:
-            for r in rankings[(game.game_year, game.game_month, game.game_day)]:
-                if r[0] == game.home_team_id:
-                    game.home_team_wins = r[1]
-                    game.home_team_losses = r[2]
-                if r[0] == game.away_team_id:
-                    game.away_team_wins = r[1]
-                    game.away_team_losses = r[2]
-        """
         games[game.game_id] = game
 
     print("parsing game details")
