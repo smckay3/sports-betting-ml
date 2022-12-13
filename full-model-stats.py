@@ -249,6 +249,9 @@ if not os.path.exists(everything_path):
 
     print("parsing game details")
     for _, player_info in tqdm(details_df.iterrows()):
+        "INJURY: Comment this out to build the dataset without knowledge of injured players"
+        if player_info["COMMENT"] == "DNP - Injury/Illness" or player_info["COMMENT"] == "DND - Injury/Illness":
+            continue
         player_stats = Player_Stats(player_info)
         if games[player_stats.game_id].home_team_id == player_stats.team_id:
             # if player_stats.player_id in players:
